@@ -4,10 +4,8 @@ package DBIx::Class::DeploymentHandler;
 
 use Moose;
 
-has initial_version => (is => 'ro', lazy_build => 1);
-sub _build_initial_version { $_[0]->database_version }
-
 extends 'DBIx::Class::DeploymentHandler::Dad';
+
 # a single with would be better, but we can't do that
 # see: http://rt.cpan.org/Public/Bug/Display.html?id=46347
 with 'DBIx::Class::DeploymentHandler::WithApplicatorDumple' => {
@@ -32,35 +30,19 @@ with 'DBIx::Class::DeploymentHandler::WithApplicatorDumple' => {
     attributes_to_assume => ['schema'],
     attributes_to_copy   => [qw(version_source version_class)],
   };
-with 'DBIx::Class::DeploymentHandler::WithReasonableDefaults';
 
-sub prepare_version_storage_install {
-  my $self = shift;
+has initial_version => (is => 'ro', lazy_build => 1);
+sub _build_initial_version { $_[0]->database_version }
 
-  $self->prepare_resultsource_install({
-    result_source => $self->version_storage->version_rs->result_source
-  });
-}
+with (
+  'DBIx::Class::DeploymentHandler::WithReasonableDefaults',
+  'DBIx::Class::DeploymentHandler::WithStandardInstalls',
+);
 
-sub install_version_storage {
-  my $self = shift;
 
-  my $version = (shift||{})->{version} || $self->schema_version;
-
-  $self->install_resultsource({
-    result_source => $self->version_storage->version_rs->result_source,
-    version       => $version,
-  });
-}
-
-sub prepare_install {
-  $_[0]->prepare_deploy;
-  $_[0]->prepare_version_storage_install;
-}
-
-# the following is just a hack so that ->version_storage
-# won't be lazy
+# the following is just a hack so that ->version_storage won't be lazy
 sub BUILD { $_[0]->version_storage }
+
 __PACKAGE__->meta->make_immutable;
 
 1;
@@ -161,28 +143,10 @@ Next would be to look at all the pieces that fill in the blanks that
 L<DBIx::Class::DeploymentHandler::Dad> expects to be filled.  They would be
 L<DBIx::Class::DeploymentHandler::DeployMethod::SQL::Translator>,
 L<DBIx::Class::DeploymentHandler::VersionHandler::Monotonic>,
-L<DBIx::Class::DeploymentHandler::VersionStorage::Standard>, and
-L<DBIx::Class::DeploymentHandler::WithReasonableDefaults>.
+L<DBIx::Class::DeploymentHandler::VersionStorage::Standard>,
+L<DBIx::Class::DeploymentHandler::WithReasonableDefaults>, and
+L<DBIx::Class::DeploymentHandler::WithStandardInstalls>.
 
-=method prepare_version_storage_install
-
- $dh->prepare_version_storage_install
-
-Creates the needed C<.sql> file to install the version storage and not the rest
-of the tables
-
-=method prepare_install
-
- $dh->prepare_install
-
-First prepare all the tables to be installed and the prepare just the version
-storage
-
-=method install_version_storage
-
- $dh->install_version_storage
-
-Install the version storage and not the rest of the tables
 
 =head1 WHY IS THIS SO WEIRD
 
